@@ -9,3 +9,4 @@
 └── data.txt            # 官方数据集
 ```
 
+本代码已在GitHub仓库[SJTUNNTA](https://github.com/ThomasAtlantis/SJTUNNTA)开源，可在网页上直接查看ipynb文档~
