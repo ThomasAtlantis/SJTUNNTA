@@ -1,0 +1,161 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "from scipy.fftpack import fft\n",
+    "from sklearn import svm\n",
+    "from sklearn.metrics import accuracy_score"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "random = np.random.RandomState(0)\n",
+    "orgn_N, test_N, K = 10000, 2000, 5\n",
+    "orgn_data = np.hstack([\n",
+    "    (np.load('data_hw2/train_data.npy') - 10) / 20, np.expand_dims(np.load('data_hw2/train_label.npy'), axis=1)])\n",
+    "test_data = np.hstack([\n",
+    "    (np.load('data_hw2/test_data.npy') - 10) / 20, np.expand_dims(np.load('data_hw2/test_label.npy'), axis=1)])\n",
+    "random.shuffle(orgn_data)\n",
+    "random.shuffle(test_data)\n",
+    "orgn_data = orgn_data[:orgn_N]\n",
+    "test_data = test_data[:test_N]\n",
+    "fold_size = orgn_N // K\n",
+    "fold_data = [orgn_data[i*fold_size: (i+1)*fold_size] for i in range(K - 1)]\n",
+    "fold_data.append(orgn_data[(K-1)*fold_size:])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "model_0 valid_acc=0.9170 tests_acc=0.7220\n",
+      "model_1 valid_acc=0.9950 tests_acc=0.6765\n",
+      "model_2 valid_acc=0.6795 tests_acc=0.6575\n",
+      "Fold 0: valid=0.8905 test=0.5190\n",
+      "\n",
+      "model_0 valid_acc=0.9140 tests_acc=0.7165\n",
+      "model_1 valid_acc=0.9980 tests_acc=0.6765\n",
+      "model_2 valid_acc=0.6865 tests_acc=0.6575\n",
+      "Fold 1: valid=0.8770 test=0.5420\n",
+      "\n",
+      "model_0 valid_acc=0.9305 tests_acc=0.7110\n",
+      "model_1 valid_acc=0.9960 tests_acc=0.6765\n",
+      "model_2 valid_acc=0.6885 tests_acc=0.6575\n",
+      "Fold 2: valid=0.8895 test=0.5375\n",
+      "\n",
+      "model_0 valid_acc=0.9200 tests_acc=0.7125\n",
+      "model_1 valid_acc=0.9935 tests_acc=0.6765\n",
+      "model_2 valid_acc=0.6675 tests_acc=0.6575\n",
+      "Fold 3: valid=0.8825 test=0.6060\n",
+      "\n",
+      "model_0 valid_acc=0.9230 tests_acc=0.7110\n",
+      "model_1 valid_acc=0.9965 tests_acc=0.6890\n",
+      "model_2 valid_acc=0.6735 tests_acc=0.6575\n",
+      "Fold 4: valid=0.8770 test=0.5595\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "DIM = 310\n",
+    "\n",
+    "def decision2proba(x):\n",
+    "    return 1 / (1 + np.exp(-x))\n",
+    "\n",
+    "def decision2class(x):\n",
+    "    return (x > 0).astype(np.int8)\n",
+    "\n",
+    "for i in range(K):\n",
+    "    models = [\n",
+    "        [svm.SVC(kernel='rbf', gamma=0.1,  C=2.2) for k in range(4)],\n",
+    "        [svm.SVC(kernel='rbf', gamma=1,     C=1) for k in range(4)],\n",
+    "        [svm.SVC(kernel='rbf', gamma=0.01, C=1.2) for k in range(4)],\n",
+    "    ]\n",
+    "    \n",
+    "    valid_data = fold_data[i]\n",
+    "    train_data = np.vstack(fold_data[:i] + fold_data[i+1:])\n",
+    "    train_X, train_y = train_data[:,:DIM], train_data[:,310]\n",
+    "    valid_X, valid_y = valid_data[:,:DIM], valid_data[:,310]\n",
+    "    tests_X, tests_y = test_data[:, :DIM], test_data[:, 310]\n",
+    "    \n",
+    "    subclass_valid, subclass_tests = [], []\n",
+    "    \n",
+    "    # 0 vs 1, -1; 0 vs 1, -1; -1 vs 0, 1\n",
+    "    for j in range(3):\n",
+    "        proj = lambda y: np.array(np.eye(3)[j])[y.astype(np.int8)]\n",
+    "        _valid_y, _tests_y = proj(valid_y), proj(tests_y)\n",
+    "        _train_data = np.hstack([train_data[:, :310], proj(train_data[:, 310:])])\n",
+    "        division = _train_data.shape[0] // 2\n",
+    "        subset_0, subset_1 = [_train_data[:division], _train_data[division:]]\n",
+    "        subset_2 = np.vstack([subset_0[subset_0[:, 310] == 1], subset_1[subset_1[:, 310] == 0]])\n",
+    "        subset_3 = np.vstack([subset_0[subset_0[:, 310] == 0], subset_1[subset_1[:, 310] == 1]])\n",
+    "        np.random.shuffle(subset_2)\n",
+    "        np.random.shuffle(subset_3)\n",
+    "        subsets = [subset_0, subset_1, subset_2, subset_3]\n",
+    "        \n",
+    "        predict_valid, predict_tests = [], []\n",
+    "        for k in range(4):\n",
+    "            models[j][k].fit(subsets[k][:, :310], subsets[k][:, 310])\n",
+    "            predict_valid.append(decision2proba(models[j][k].decision_function(valid_X)))\n",
+    "            predict_tests.append(decision2proba(models[j][k].decision_function(tests_X)))\n",
+    "\n",
+    "        predict_valid = np.array(predict_valid)\n",
+    "        y_hat = np.max(np.vstack([\n",
+    "            np.min(predict_valid[[0, 2], :], axis=0), \n",
+    "            np.min(predict_valid[[1, 3], :], axis=0)\n",
+    "        ]), axis=0).reshape(-1, 1)\n",
+    "        subclass_valid.append(y_hat)\n",
+    "        valid_acc = accuracy_score(_valid_y, np.argmax(np.hstack([1-y_hat, y_hat]), axis=-1))\n",
+    "        \n",
+    "        predict_tests = np.array(predict_tests)\n",
+    "        y_hat = np.max(np.vstack([\n",
+    "            np.min(predict_tests[[0, 2], :], axis=0), \n",
+    "            np.min(predict_tests[[1, 3], :], axis=0)\n",
+    "        ]), axis=0).reshape(-1, 1)\n",
+    "        subclass_tests.append(y_hat)\n",
+    "        tests_acc = accuracy_score(_tests_y, np.argmax(np.hstack([1-y_hat, y_hat]), axis=-1))\n",
+    "        print(\"model_%d valid_acc=%.4f tests_acc=%.4f\" % (j, valid_acc, tests_acc))\n",
+    "            \n",
+    "    valid_acc = accuracy_score(valid_y, np.array([0, 1, -1])[np.argmax(subclass_valid, axis=0)])\n",
+    "    tests_acc = accuracy_score(tests_y, np.array([0, 1, -1])[np.argmax(subclass_tests, axis=0)])\n",
+    "    print(\"Fold %d: valid=%.4f test=%.4f\\n\" % (i, valid_acc, tests_acc))"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
