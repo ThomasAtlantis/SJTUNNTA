@@ -29,3 +29,12 @@ Assignment_3
 └── data.pkl  # 官方数据集
 ```
 
+### 作业四
+
+```python
+Assignment_4
+├── LSTM.py   # LSTM的实现代码
+└── plots.py  # 绘制统计图的代码
+# 数据文件data_hw2见Assignment_2
+```
+
